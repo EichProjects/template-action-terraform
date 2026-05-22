@@ -1,0 +1,74 @@
+name: Terraform
+
+on:
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_HOST_URL:
+        required: true
+    inputs:
+      deploy:
+        description: Faz deploy da aplicacao
+        type: boolean
+        default: false
+      environment:
+        description: Nome do environment do GitHub a ser usado no deploy
+        type: string
+
+jobs:
+  plan:
+    runs-on: eich
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/sast
+        with:
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Init
+        run: terraform init
+
+      - name: Plan
+        run: terraform plan -out=tfplan
+
+      - name: Upload do plano como artefato
+        if: ${{ inputs.deploy }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: plano-binario
+          path: tfplan
+          retention-days: 0
+
+  apply:
+    runs-on: eich
+    environment: ${{ inputs.environment }}
+    needs: plan
+    if: ${{ inputs.deploy }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Init
+        run: terraform init
+      - name: Download do plano do artefato
+        uses: actions/download-artifact@v4
+        with:
+          name: plano-binario
+      - name: Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Resultado
+        run: |
+          echo "Terraform aplicado no ambiente: ${{ inputs.environment }} - Ambiente: $AMBIENTE"
+        env:
+          AMBIENTE: ${{ vars.AMBIENTE }}
+
+  limpeza:
+    if: always()
+    needs: apply
+    runs-on: eich
+    steps:
+      - name: Limpar
+        uses: ./.github/actions/limpeza
