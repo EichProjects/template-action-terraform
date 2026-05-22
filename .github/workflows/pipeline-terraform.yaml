@@ -71,4 +71,4 @@ jobs:
     runs-on: eich
     steps:
       - name: Limpar
-        uses: EichProjects/template-action-limpeza/.github/actions/limpeza@master
+        uses: EichProjects/template-action-sast/.github/actions/limpeza@master
